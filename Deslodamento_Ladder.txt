@@ -1,0 +1,187 @@
+(*============================================================================
+  PROGRAMA EM LADDER (CONTATOS)
+  
+  Projeto: Centrífuga de Suco - Sistema de Deslodamento
+  Versão: Ladder equivalente ao ST
+  
+  Representação em texto da lógica de contatos:
+  
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                     DETECÇÃO START (> 2 segundos)                   │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   DI1          TON               Start_Hold_Q                        │
+  │  ──|/|─────[TON: 2s]────────────( )────[Set Is_Running]             │
+  │      Start_Hold_Timer                                                │
+  │                                                                       │
+  │                          PARADA (STOP)                               │
+  │                                                                       │
+  │   DI2                                                                │
+  │  ──|/|────────────────────────────────[Reset Is_Running]            │
+  │                                       [Reset DO1_Valve]             │
+  │                                       [Reset State = 0]             │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+  
+  
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │            MÁQUINA DE ESTADOS - PULSE PARCIAL (State=1)             │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   Is_Running    State=1                                              │
+  │  ──|/|────┬───|/|──────┬───[TON: Time_Partial]                      │
+  │           │             │   Desludge_Timer                          │
+  │           │             │                                            │
+  │           │      ┌──────┴───[Set DO1_Valve = 1]                     │
+  │           │      │          [Set DO1_Trace = 1.0]                   │
+  │           │      │                                                   │
+  │           │      │      Desludge_Timer.Q                            │
+  │           │      └───|/|──[Set DO1_Valve = 0]                       │
+  │           │              [Set DO1_Trace = 0.0]                      │
+  │           │              [INC Pulse_Count]                          │
+  │           │              [Set State = 4]                            │
+  │           │                                                          │
+  │           └──────────[Set Current_Desludge_Type]                    │
+  │                      [Set System_Status = PARCIAL]                  │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+  
+  
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │           MÁQUINA DE ESTADOS - PULSE LONGO (State=2)                │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   Is_Running    State=2                                              │
+  │  ──|/|────┬───|/|──────┬───[TON: Time_Long_Partial]                 │
+  │           │             │   Desludge_Timer                          │
+  │           │             │                                            │
+  │           │      ┌──────┴───[Set DO1_Valve = 1]                     │
+  │           │      │          [Set DO1_Trace = 1.0]                   │
+  │           │      │                                                   │
+  │           │      │      Desludge_Timer.Q                            │
+  │           │      └───|/|──[Set DO1_Valve = 0]                       │
+  │           │              [Set DO1_Trace = 0.0]                      │
+  │           │              [INC Pulse_Count]                          │
+  │           │              [Set State = 4]                            │
+  │           │                                                          │
+  │           └──────────[Set Current_Desludge_Type]                    │
+  │                      [Set System_Status = LONGO]                    │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+  
+  
+  ┌─────────────��───────────────────────────────────────────────────────┐
+  │            MÁQUINA DE ESTADOS - PULSE TOTAL (State=3)               │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   Is_Running    State=3                                              │
+  │  ──|/|────┬───|/|──────┬───[TON: Time_Total_Desludge]               │
+  │           │             │   Desludge_Timer                          │
+  │           │             │                                            │
+  │           │      ┌──────┴───[Set DO1_Valve = 1]                     │
+  │           │      │          [Set DO1_Trace = 1.0]                   │
+  │           │      │                                                   │
+  │           │      │      Desludge_Timer.Q                            │
+  │           │      └───|/|──[Set DO1_Valve = 0]                       │
+  │           │              [Set DO1_Trace = 0.0]                      │
+  │           │              [INC Cycle_Count]                          │
+  │           │              [Reset Pulse_Count]                        │
+  │           │              [Reset Is_Running]                         │
+  │           │              [Set System_Status = COMPLETO]             │
+  │           │                                                          │
+  │           └──────────[Set Current_Desludge_Type]                    │
+  │                      [Set System_Status = TOTAL]                    │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+  
+  
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                 MÁQUINA DE ESTADOS - WAIT (State=4)                 │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   Is_Running    State=4                                              │
+  │  ──|/|────┬───|/|──────┬───[TON: Time_Between_Pulses]               │
+  │           │             │   Pulse_Timer                             │
+  │           │             │                                            │
+  │           │      ┌──────┴───[Reset DO1_Valve]                       │
+  │           │      │          [Reset DO1_Trace]                       │
+  │           │      │                                                   │
+  │           │      │      Pulse_Timer.Q                               │
+  │           │      │  ┌───|/|──[Check Pulse_Count]                    │
+  │           │      │  │   = 3: [Set State = 2] (Longo)                │
+  │           │      │  │   = 4: [Set State = 3] (Total)                │
+  │           │      │  │   else: [Set State = 1] (Parcial)             │
+  │           │      │  │                                                │
+  │           │      └──┴──────────────────────                          │
+  │           │                                                          │
+  │           └──────────[Set Current_Desludge_Type]                    │
+  │                      [Set System_Status = AGUARDANDO]               │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+  
+  
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                    SAÍDA FINAL - DO1_VALVE                          │
+  ├─────────────────────────────────────────────────────────────────────┤
+  │                                                                       │
+  │   DO1_Valve_State                                                    │
+  │  ──|/|──────────────────────────────────────( DO1 )                 │
+  │                                                                       │
+  │   DO1_Trace (para WebVisu)                                           │
+  │  ──|/|──────────────────────────────────────( TRACE )               │
+  │                                                                       │
+  └─────────────────────────────────────────────────────────────────────┘
+
+============================================================================
+OBSERVAÇÕES IMPORTANTES:
+
+1. Esta representação é uma equivalência lógica do programa ST
+2. No CODESYS, use o editor de diagrama de contatos (FBD/LD) para implementar
+3. Os timers (TON) são componentes padrão do CODESYS
+4. As instruções [Set] e [Reset] representam bobinas diretas e negadas
+5. As verificações [Check] representam comparações em paralelo (OR)
+
+============================================================================*)
+
+(* DIAGRAMA DE TRANSIÇÃO DE ESTADOS *)
+(*
+  
+  Estado 0 (IDLE)
+  ├─ DI1 > 2s ──→ Estado 1 (DESLODAMENTO PARCIAL)
+  │
+  └─ DI2 ─→ Retorna a Estado 0
+
+
+  Estado 1 (DESLODAMENTO PARCIAL - 1 seg)
+  ├─ Timer finalizado ──→ Estado 4 (WAIT)
+  │                       Pulse_Count++
+  │
+  └─ DI2 ─→ Estado 0
+
+
+  Estado 4 (WAIT - 5 seg entre pulsos)
+  ├─ Timer finalizado + Pulse_Count == 3 ──→ Estado 2
+  ├─ Timer finalizado + Pulse_Count == 4 ──→ Estado 3
+  └─ Timer finalizado + Pulse_Count < 3 ──→ Estado 1
+
+
+  Estado 2 (DESLODAMENTO PARCIAL LONGO - 6 seg)
+  ├─ Timer finalizado ──→ Estado 4
+  │                       Pulse_Count++
+  │
+  └─ DI2 ─→ Estado 0
+
+
+  Estado 4 (WAIT)
+  └─ Timer finalizado + Pulse_Count == 4 ──→ Estado 3
+
+
+  Estado 3 (DESLODAMENTO TOTAL - 30 seg)
+  ├─ Timer finalizado ──→ Estado 0
+  │                       Cycle_Count++
+  │                       Pulse_Count = 0
+  │                       Is_Running = FALSE
+  │
+  └─ DI2 ─→ Estado 0
+
+*)
