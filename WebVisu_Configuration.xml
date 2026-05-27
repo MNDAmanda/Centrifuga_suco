@@ -1,0 +1,374 @@
+(*============================================================================
+  CONFIGURAÇÃO WebVisu - INTERFACE GRÁFICA
+  
+  Projeto: Centrífuga de Suco - Sistema de Deslodamento
+  Ferramenta: CODESYS WebVisu
+  
+  Componentes da interface:
+  1. Botão de parada (DI2)
+  2. Gráfico de estado da válvula (DO1) em função do tempo
+  3. Presets ajustáveis
+  4. Display do contador de ciclos
+  5. Mensagem de status do tipo de deslodamento
+============================================================================*)
+
+(* 
+  ESTRUTURA HTML/XML PARA WebVisu
+  
+  Este arquivo contém a definição dos elementos da interface visual
+  Compatível com CODESYS WebVisu v3.5+
+*)
+
+<?xml version="1.0" encoding="utf-8"?>
+<codesys>
+  <form Name="Desludging_Control" Width="1200" Height="800">
+    
+    <!-- ================================================================ -->
+    <!-- SEÇÃO 1: CONTROLES PRINCIPAIS -->
+    <!-- ================================================================ -->
+    
+    <panel Name="pnl_Controls" X="10" Y="10" Width="350" Height="150" 
+           BorderStyle="Sunken" BackColor="0xF0F0F0">
+      <label Name="lbl_Controls" X="10" Y="10" Width="330" Height="20">
+        <text>CONTROLES DO SISTEMA</text>
+        <font Bold="TRUE" Size="14"/>
+      </label>
+      
+      <!-- Botão de Parada -->
+      <button Name="btn_Stop" X="10" Y="40" Width="150" Height="50" 
+              Text="PARAR CICLO" BackColor="0xFF0000" ForeColor="0xFFFFFF">
+        <event OnClick="DI2_Stop := TRUE"/>
+        <font Bold="TRUE" Size="12"/>
+      </button>
+      
+      <!-- Status do Sistema -->
+      <statictext Name="txt_Status" X="170" Y="40" Width="160" Height="50" 
+                  BackColor="0xEEEEEE" BorderStyle="Sunken">
+        <binding TargetProperty="Text" SourceVariable="System_Status"/>
+        <font Size="11" Bold="TRUE" Color="0x0000FF"/>
+      </statictext>
+      
+      <!-- Indicador Visual Sistema Rodando -->
+      <circle Name="ind_Running" X="10" Y="100" Width="40" Height="40">
+        <binding TargetProperty="FillColor" 
+                 SourceVariable="Is_Running">
+          <expression>
+            IF Is_Running THEN 0x00FF00 ELSE 0xCCCCCC
+          </expression>
+        </binding>
+      </circle>
+      <label Name="lbl_Running" X="55" Y="105" Width="100" Height="30">
+        <text>Sistema Ativo</text>
+      </label>
+      
+    </panel>
+    
+    
+    <!-- ================================================================ -->
+    <!-- SEÇÃO 2: GRÁFICO DE TRACE - ESTADO DO DO1 -->
+    <!-- ================================================================ -->
+    
+    <panel Name="pnl_Graph" X="10" Y="170" Width="550" Height="350" 
+           BorderStyle="Sunken" BackColor="0xFFFFFF">
+      <label Name="lbl_Graph" X="10" Y="10" Width="530" Height="20">
+        <text>GRÁFICO - ESTADO DA VÁLVULA DO1 (Trace)</text>
+        <font Bold="TRUE" Size="12"/>
+      </label>
+      
+      <!-- Gráfico com múltiplos traços -->
+      <plottinarea Name="plot_DO1" X="10" Y="35" Width="530" Height="305" 
+                   XAxisLabel="Tempo (s)" YAxisLabel="Estado"
+                   Grid="TRUE" GridColor="0xE0E0E0" 
+                   BorderStyle="Sunken">
+        
+        <!-- Traço 1: Estado Digital DO1 -->
+        <trace Name="trace_DO1_Digital" 
+               SourceVariable="DO1_Valve"
+               Color="0xFF0000" 
+               Width="2"
+               Label="DO1 (Digital)"/>
+        
+        <!-- Traço 2: Valor Analógico para visualização suave -->
+        <trace Name="trace_DO1_Analog" 
+               SourceVariable="DO1_Trace"
+               Color="0x0000FF" 
+               Width="2"
+               Label="DO1 (Analógico 0-1)"/>
+        
+      </plottinarea>
+      
+    </panel>
+    
+    
+    <!-- ================================================================ -->
+    <!-- SEÇÃO 3: CONTADOR DE CICLOS -->
+    <!-- ================================================================ -->
+    
+    <panel Name="pnl_Counter" X="570" Y="170" Width="300" Height="150" 
+           BorderStyle="Sunken" BackColor="0xF0F0F0">
+      <label Name="lbl_Counter" X="10" Y="10" Width="280" Height="20">
+        <text>CONTADOR DE CICLOS</text>
+        <font Bold="TRUE" Size="12"/>
+      </label>
+      
+      <label Name="lbl_Cycles" X="10" Y="40" Width="100" Height="30">
+        <text>Ciclos Completos:</text>
+        <font Size="11"/>
+      </label>
+      
+      <!-- Display do Contador -->
+      <numericfield Name="num_CycleCount" X="120" Y="40" Width="160" Height="30" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken" ReadOnly="TRUE">
+        <binding TargetProperty="Value" SourceVariable="Cycle_Count"/>
+        <font Bold="TRUE" Size="14"/>
+      </numericfield>
+      
+      <!-- Contador de Pulsos -->
+      <label Name="lbl_Pulses" X="10" Y="75" Width="100" Height="30">
+        <text>Pulsos Atuais:</text>
+        <font Size="11"/>
+      </label>
+      
+      <numericfield Name="num_PulseCount" X="120" Y="75" Width="160" Height="30" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken" ReadOnly="TRUE">
+        <binding TargetProperty="Value" SourceVariable="Pulse_Count"/>
+        <font Bold="TRUE" Size="14"/>
+      </numericfield>
+      
+    </panel>
+    
+    
+    <!-- ================================================================ -->
+    <!-- SEÇÃO 4: MENSAGEM DE STATUS DO DESLODAMENTO -->
+    <!-- ================================================================ -->
+    
+    <panel Name="pnl_Status" X="570" Y="330" Width="620" Height="190" 
+           BorderStyle="Sunken" BackColor="0xFFFACD">
+      <label Name="lbl_Status" X="10" Y="10" Width="600" Height="20">
+        <text>TIPO DE DESLODAMENTO EM ANDAMENTO</text>
+        <font Bold="TRUE" Size="12" Color="0xFF0000"/>
+      </label>
+      
+      <!-- Display da Mensagem -->
+      <statictext Name="txt_DesludgeType" X="10" Y="35" Width="600" Height="80" 
+                  BackColor="0xFFFFFF" BorderStyle="Sunken" 
+                  WordWrap="TRUE" VerticalAlign="Top">
+        <binding TargetProperty="Text" SourceVariable="Current_Desludge_Type"/>
+        <font Size="14" Bold="TRUE" Color="0x0066CC"/>
+      </statictext>
+      
+      <!-- Estado Detalhado -->
+      <label Name="lbl_State" X="10" Y="120" Width="100" Height="25">
+        <text>Estado Atual:</text>
+        <font Size="10"/>
+      </label>
+      
+      <statictext Name="txt_State" X="120" Y="120" Width="490" Height="25" 
+                  BackColor="0xF5F5F5" BorderStyle="Sunken">
+        <binding TargetProperty="Text" SourceVariable="State">
+          <expression>
+            CASE State OF
+              0: "IDLE - Aguardando início"
+              1: "PULSO PARCIAL (1s)"
+              2: "PULSO PARCIAL LONGO (6s)"
+              3: "PULSO TOTAL (30s)"
+              4: "AGUARDANDO PRÓXIMO PULSO"
+            ELSE
+              "ESTADO DESCONHECIDO"
+            END_CASE
+          </expression>
+        </binding>
+        <font Size="10"/>
+      </statictext>
+      
+      <!-- Tempo de Contagem -->
+      <label Name="lbl_Time" X="10" Y="150" Width="100" Height="25">
+        <text>Tempo Decorrido:</text>
+        <font Size="10"/>
+      </label>
+      
+      <statictext Name="txt_Time" X="120" Y="150" Width="490" Height="25" 
+                  BackColor="0xF5F5F5" BorderStyle="Sunken">
+        <font Size="10"/>
+      </statictext>
+      
+    </panel>
+    
+    
+    <!-- ================================================================ -->
+    <!-- SEÇÃO 5: PRESETS CONFIGURÁVEIS -->
+    <!-- ================================================================ -->
+    
+    <panel Name="pnl_Presets" X="10" Y="530" Width="1180" Height="260" 
+           BorderStyle="Sunken" BackColor="0xF0F0F0">
+      <label Name="lbl_Presets" X="10" Y="10" Width="1160" Height="20">
+        <text>CONFIGURAÇÃO DE PRESETS (Tempos em segundos)</text>
+        <font Bold="TRUE" Size="12"/>
+      </label>
+      
+      <!-- Preset 1: Tempo entre Pulsos -->
+      <label Name="lbl_Preset1" X="20" Y="40" Width="250" Height="25">
+        <text>Tempo entre Pulsos:</text>
+        <font Size="11"/>
+      </label>
+      
+      <numericfield Name="num_Preset1" X="280" Y="40" Width="100" Height="25" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken">
+        <binding TargetProperty="Value" SourceVariable="Time_Between_Pulses" 
+                 ConversionExpression="Value / 1000"/>
+        <font Size="11"/>
+      </numericfield>
+      
+      <label Name="lbl_Unit1" X="390" Y="40" Width="50" Height="25">
+        <text>seg</text>
+        <font Size="11"/>
+      </label>
+      
+      <statictext Name="txt_DefaultValue1" X="450" Y="40" Width="150" Height="25" 
+                  BackColor="0xE8E8E8">
+        <text>(Padrão: 5s)</text>
+        <font Size="9" Color="0x666666"/>
+      </statictext>
+      
+      
+      <!-- Preset 2: Deslodamento Parcial -->
+      <label Name="lbl_Preset2" X="20" Y="75" Width="250" Height="25">
+        <text>Deslodamento Parcial:</text>
+        <font Size="11"/>
+      </label>
+      
+      <numericfield Name="num_Preset2" X="280" Y="75" Width="100" Height="25" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken">
+        <binding TargetProperty="Value" SourceVariable="Time_Partial_Desludge" 
+                 ConversionExpression="Value / 1000"/>
+        <font Size="11"/>
+      </numericfield>
+      
+      <label Name="lbl_Unit2" X="390" Y="75" Width="50" Height="25">
+        <text>seg</text>
+        <font Size="11"/>
+      </label>
+      
+      <statictext Name="txt_DefaultValue2" X="450" Y="75" Width="150" Height="25" 
+                  BackColor="0xE8E8E8">
+        <text>(Padrão: 1s)</text>
+        <font Size="9" Color="0x666666"/>
+      </statictext>
+      
+      
+      <!-- Preset 3: Deslodamento Parcial Longo -->
+      <label Name="lbl_Preset3" X="20" Y="110" Width="250" Height="25">
+        <text>Deslodamento Parcial Longo:</text>
+        <font Size="11"/>
+      </label>
+      
+      <numericfield Name="num_Preset3" X="280" Y="110" Width="100" Height="25" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken">
+        <binding TargetProperty="Value" SourceVariable="Time_Long_Partial" 
+                 ConversionExpression="Value / 1000"/>
+        <font Size="11"/>
+      </numericfield>
+      
+      <label Name="lbl_Unit3" X="390" Y="110" Width="50" Height="25">
+        <text>seg</text>
+        <font Size="11"/>
+      </label>
+      
+      <statictext Name="txt_DefaultValue3" X="450" Y="110" Width="150" Height="25" 
+                  BackColor="0xE8E8E8">
+        <text>(Padrão: 6s)</text>
+        <font Size="9" Color="0x666666"/>
+      </statictext>
+      
+      
+      <!-- Preset 4: Deslodamento Total -->
+      <label Name="lbl_Preset4" X="20" Y="145" Width="250" Height="25">
+        <text>Deslodamento Total:</text>
+        <font Size="11"/>
+      </label>
+      
+      <numericfield Name="num_Preset4" X="280" Y="145" Width="100" Height="25" 
+                    TextAlign="Right" BackColor="0xFFFFFF" 
+                    BorderStyle="Sunken">
+        <binding TargetProperty="Value" SourceVariable="Time_Total_Desludge" 
+                 ConversionExpression="Value / 1000"/>
+        <font Size="11"/>
+      </numericfield>
+      
+      <label Name="lbl_Unit4" X="390" Y="145" Width="50" Height="25">
+        <text>seg</text>
+        <font Size="11"/>
+      </label>
+      
+      <statictext Name="txt_DefaultValue4" X="450" Y="145" Width="150" Height="25" 
+                  BackColor="0xE8E8E8">
+        <text>(Padrão: 30s)</text>
+        <font Size="9" Color="0x666666"/>
+      </statictext>
+      
+      
+      <!-- Botão de Reset -->
+      <button Name="btn_ResetPresets" X="20" Y="190" Width="150" Height="40" 
+              Text="RESETAR PADRÕES" BackColor="0xFFA500" ForeColor="0xFFFFFF">
+        <event OnClick="
+          Time_Between_Pulses := 5000;
+          Time_Partial_Desludge := 1000;
+          Time_Long_Partial := 6000;
+          Time_Total_Desludge := 30000;
+        "/>
+        <font Bold="TRUE" Size="10"/>
+      </button>
+      
+      <!-- Info de Ajuda -->
+      <statictext Name="txt_Info" X="280" Y="190" Width="900" Height="40" 
+                  BackColor="0xFFFACD" BorderStyle="Sunken" 
+                  WordWrap="TRUE" VerticalAlign="Top">
+        <text>ℹ️ Os tempos são armazenados em milissegundos (ms) internamente. 
+Os valores exibidos estão em segundos (s). Clique em RESETAR PADRÕES para voltar aos valores originais.</text>
+        <font Size="9" Color="0x333333"/>
+      </statictext>
+      
+    </panel>
+    
+  </form>
+</codesys>
+
+(*============================================================================
+  NOTAS SOBRE A INTERFACE WebVisu:
+  
+  1. GRÁFICO DE TRACE:
+     - Mostra o histórico de DO1 em tempo real
+     - DO1_Valve = estado digital (0 ou 1)
+     - DO1_Trace = valor analógico (0.0 a 1.0) para visualização suave
+     - Atualiza a cada scan do programa
+  
+  2. PRESETS AJUSTÁVEIS:
+     - Todos os tempos são armazenados em MILISSEGUNDOS internamente
+     - A interface exibe e aceita valores em SEGUNDOS
+     - Conversão automática: valor_webvisu * 1000 = valor_interno
+     - Botão RESETAR PADRÕES restaura os valores iniciais
+  
+  3. CONTADOR DE CICLOS:
+     - Ciclos Completos: incrementa após deslodamento total
+     - Pulsos Atuais: mostra etapa atual do ciclo (0-4)
+  
+  4. MENSAGEM DE STATUS:
+     - Muda dinamicamente conforme o tipo de deslodamento
+     - Possíveis mensagens:
+       * "Ciclo de deslodamento parcial"
+       * "Ciclo de deslodamento parcial longo"
+       * "Ciclo de deslodamento total"
+       * "Aguardando próximo pulso"
+       * "Ciclo completo finalizado"
+  
+  5. RESPONSIVIDADE:
+     - Interface adaptável para diferentes resoluções
+     - Compatível com navegadores modernos
+     - Suporta acesso remoto via HTTP/HTTPS
+     
+============================================================================*)
